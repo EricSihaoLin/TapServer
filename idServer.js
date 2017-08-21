@@ -1,5 +1,6 @@
 var config = require('./config.json')
 var mysql = require('mysql')
+var querystring = require('querystring')
 var io = require('socket.io').listen(3000)
 var rfid = mysql.createConnection({
 	host: config.rfid_database_host,
@@ -14,8 +15,7 @@ var tap = mysql.createConnection({
 	password: tap.rfid_database_password
 })
 
-var monitorCount = 0
-var socketCount = 0;
+var monitorCount = 0;
 var hasInitialized = false
 //NetID list for today's new users
 var clientTapList = []
@@ -55,18 +55,21 @@ function onStationConnect(socket){
 
 
 // Initialize socket.io connection handlers
-io.sockets.on('connection', function(socket)){
+io.sockets.on('connection', function(socket){
 	//New socket connection, increase socket count
 	monitorCount++;
 	//Let all sockets know how many devices are currently online
-	io.socket.emit('monitors connected', socketCount)
 	
 	socket.on('disconnect', function(){
 	    //Update current count to all users
-	    socketCount--
-	    io.socket.emit('user connected', socketCount)	
-	})
+	    socketCount--;
+	});
+	
+	socket.on('rfid', function(data){
+		var result = querystring.parse(data);
+		console.log('[INFO] Data received' + result);
+	});
 	
 	
-})
+});
 
