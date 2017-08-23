@@ -56,9 +56,6 @@ function onTap(id, socket){
 				if(rows[0].affiliationSubtype.indexOf("degree") !== -1){
 					io.emit('accept', {name: rows[0].cn, netid: rows[0].uid, notes: "Current Degree Student"});
 					console.log('[Info] Accepting ' + id);
-					console.log(rows[0]);
-					console.log(rows[0].cn);
-					console.log(rows[0].uid);
 				}
 				else{
 					io.emit('deny', {name: rows[0].cn, netid: rows[0].uid, notes: "Not Current Degree Student"});
