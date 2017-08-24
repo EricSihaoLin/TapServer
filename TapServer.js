@@ -1,7 +1,6 @@
 var config = require('./config.json');
 var mysql = require('mysql');
 var io = require('socket.io')(3000);
-var querystring = require('querystring');
 
 var rfid = mysql.createConnection({
 	host: config.rfid_database_host,
@@ -40,57 +39,71 @@ tap.connect(function(err){
 });
 console.log('[Info] Database connection established');
 
+function logTap(status, rfid, name, netid, station, notes){
+	var logQuery = "INSERT INTO client_access_log (status, rfid, name, netid, notes, station) VALUES ('" + status + "', '" + rfid + "', '" + name + "', '" + netid + "', '" + notes + "', '" + station + "')";
+	tap.query(logQuery);
+}
+
 
 //Initialize Core Functions
-function onTap(id, socket){
-	console.log('[Info] Validating ' + id);
-	var queryString = 'SELECT * FROM user_rfid WHERE rfid = ' + id;
+function onTap(data, socket){
+	console.log('[Info] Validating ' + data.rfid);
+	var queryString = 'SELECT * FROM user_rfid WHERE rfid = ' + data.rfid;
 	rfid.query(queryString, function(err, rows, fields) {
 		if (err) throw err;
 		if (!rows.length){
 			io.emit('deny', {name: "", netid: "", notes: "Invalid ID"});
-			console.log('[Info] Denying ' + id);
+			logTap("Denied", data.rfid, "", "", data.station, "Invalid ID");
+			console.log('[Info] Denying ' + data.rfid);
 		}
 		if (rows.length == 1){
 			if (rows[0].eduPersonPrimaryAffiliation === "student"){
 				if(rows[0].affiliationSubtype.indexOf("degree") !== -1){
-					io.emit('accept', {name: rows[0].cn, netid: rows[0].uid, notes: "Current Degree Student"});
-					console.log('[Info] Accepting ' + id);
+					io.emit('accept', {name: rows[0].cn, netid: rows[0].uid, notes: "Current Degree Student", station: data.station});
+					logTap("Accepted", data.rfid, rows[0].cn, rows[0].uid, data.station, "Current Degree Student");
+					console.log('[Info] Accepting ' + data.rfid);
 				}
 				else{
-					io.emit('deny', {name: rows[0].cn, netid: rows[0].uid, notes: "Not Current Degree Student"});
-					console.log('[Info] Denying ' + id);
+					io.emit('deny', {name: rows[0].cn, netid: rows[0].uid, notes: "Not Current Degree Student", station: data.station});
+					logTap("Denied", data.rfid, rows[0].cn, rows[0].uid, data.station, "Not Current Degree Student");
+					console.log('[Info] Denying ' + data.rfid);
 				}
 			}
 			else if (rows[0].eduPersonPrimaryAffiliation === "employee"){
 				if(rows[0].division.indexOf("NYU IT") !== -1){
-					io.emit('accept', {name: rows[0].cn, netid: rows[0].uid, notes: "Current NYU IT Employee"});
-					console.log('[Info] Accepting ' + id);
+					io.emit('accept', {name: rows[0].cn, netid: rows[0].uid, notes: "Current NYU IT Employee", station: data.station});
+					logTap("Accepted", data.rfid, rows[0].cn, rows[0].uid, data.station, "Current NYU IT Employee");
+					console.log('[Info] Accepting ' + data.rfid);
 				}
 				else{
 					if(rows[0].affiliationSubtype.indexOf("administrator") !== -1){
-						io.emit('deny', {name: rows[0].cn, netid: rows[0].uid, notes: "Administrative Staff No Access"});
-						console.log('[Info] Denying ' + id);
+						io.emit('deny', {name: rows[0].cn, netid: rows[0].uid, notes: "Administrative Staff No Access", station: data.station});
+						logTap("Denied", data.rfid, rows[0].cn, rows[0].uid, data.station, "Administrative Staff No Access");
+						console.log('[Info] Denying ' + data.rfid);
 					}
 					else{
-						io.emit('accept', {name: rows[0].cn, netid: rows[0].uid, notes: "Current Employee"});
-						console.log('[Info] Accepting ' + id);
+						io.emit('accept', {name: rows[0].cn, netid: rows[0].uid, notes: "Current Employee", station: data.station});
+						logTap("Accepted", data.rfid, rows[0].cn, rows[0].uid, data.station, "Current Employee");
+						console.log('[Info] Accepting ' + data.rfid);
 					}
 				}
 			}
 			else if (rows[0].eduPersonPrimaryAffiliation === "faculty"){
-				io.emit('accept', {name: rows[0].cn, netid: rows[0].uid, notes: "Current Faculty"});
-				console.log('[Info] Accepting ' + id);
+				io.emit('accept', {name: rows[0].cn, netid: rows[0].uid, notes: "Current Faculty", station: data.station});
+				logTap("Accepted", data.rfid, rows[0].cn, rows[0].uid, data.station, "Current Faculty");
+				console.log('[Info] Accepting ' + data.rfid);
 			}
 			else if (rows[0].eduPersonPrimaryAffiliation === "alum"){
-				io.emit('deny', {name: rows[0].cn, netid: rows[0].uid, notes: "Alumni"});
-				console.log('[Info] Denying ' + id);
+				io.emit('deny', {name: rows[0].cn, netid: rows[0].uid, notes: "Alumni No Access", station: data.station});
+				logTap("Denied", data.rfid, rows[0].cn, rows[0].uid, data.station, "Alumni No Access");
+				console.log('[Info] Denying ' + data.rfid);
 			}
 		}
 		else
 		{
-			io.emit('deny', {name: "", netid: "", notes: "RFID Collision"});
-			console.log('[Info] Denying ' + id);
+			io.emit('deny', {name: "", netid: "", notes: "RFID Collision", station: data.station});
+			logTap("Denied", data.rfid, "", "", data.station, "RFID Collision");
+			console.log('[Info] Denying ' + data.rfid);
 		}
 	});
 }
